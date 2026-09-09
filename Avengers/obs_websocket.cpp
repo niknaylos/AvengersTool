@@ -11,29 +11,9 @@
 #include <queue>
 #include <string>
 #include <thread>
-#include <vector>
 
-#pragma comment(lib, "winhttp.lib")
-#pragma comment(lib, "bcrypt.lib")
-#pragma comment(lib, "crypt32.lib")
-
-namespace
+namespace obs_websocket
 {
-	enum class Command
-	{
-		StartRecord,
-		StopRecord,
-		Quit
-	};
-
-	struct Config
-	{
-		bool enabled = false;
-		std::string host = "127.0.0.1";
-		INTERNET_PORT port = 4455;
-		std::string password;
-	};
-
 	std::mutex gMutex;
 	std::condition_variable gWake;
 	std::queue<Command> gCommands;
@@ -57,9 +37,9 @@ namespace
 		return true;
 	}
 
-	std::string base64Encode(const unsigned char* data, DWORD size)
+	std::string base64Encode(const unsigned char* data, unsigned long size)
 	{
-		DWORD chars = 0;
+		unsigned long chars = 0;
 		if (!CryptBinaryToStringA(data, size, CRYPT_STRING_BASE64 | CRYPT_STRING_NOCRLF, nullptr, &chars)
 			|| chars == 0) {
 			return {};
@@ -82,20 +62,19 @@ namespace
 		if (BCryptOpenAlgorithmProvider(&alg, BCRYPT_SHA256_ALGORITHM, nullptr, 0) < 0) {
 			return {};
 		}
-		const NTSTATUS created = BCryptCreateHash(alg, &hash, nullptr, 0, nullptr, 0, 0);
-		NTSTATUS hashed = created;
-		if (hashed >= 0) {
-			hashed = BCryptHashData(hash, reinterpret_cast<PUCHAR>(const_cast<char*>(input.data())),
+		NTSTATUS status = BCryptCreateHash(alg, &hash, nullptr, 0, nullptr, 0, 0);
+		if (status >= 0) {
+			status = BCryptHashData(hash, reinterpret_cast<PUCHAR>(const_cast<char*>(input.data())),
 				static_cast<ULONG>(input.size()), 0);
 		}
-		if (hashed >= 0) {
-			hashed = BCryptFinishHash(hash, digest, sizeof(digest), 0);
+		if (status >= 0) {
+			status = BCryptFinishHash(hash, digest, sizeof(digest), 0);
 		}
 		if (hash) {
 			BCryptDestroyHash(hash);
 		}
 		BCryptCloseAlgorithmProvider(alg, 0);
-		if (hashed < 0) {
+		if (status < 0) {
 			return {};
 		}
 		return base64Encode(digest, sizeof(digest));
@@ -109,12 +88,9 @@ namespace
 
 	std::wstring utf16(const std::string& text)
 	{
-		if (text.empty()) {
-			return L"127.0.0.1";
-		}
 		const int chars = MultiByteToWideChar(CP_UTF8, 0, text.c_str(), -1, nullptr, 0);
 		if (chars <= 1) {
-			return L"127.0.0.1";
+			return {};
 		}
 		std::wstring wide(static_cast<size_t>(chars - 1), L'\0');
 		MultiByteToWideChar(CP_UTF8, 0, text.c_str(), -1, wide.data(), chars);
@@ -126,9 +102,9 @@ namespace
 		out->clear();
 		for (;;) {
 			char chunk[4096];
-			DWORD got = 0;
+			unsigned long got = 0;
 			WINHTTP_WEB_SOCKET_BUFFER_TYPE type = WINHTTP_WEB_SOCKET_UTF8_MESSAGE_BUFFER_TYPE;
-			const DWORD status = WinHttpWebSocketReceive(socket, chunk, sizeof(chunk), &got, &type);
+			const unsigned long status = WinHttpWebSocketReceive(socket, chunk, sizeof(chunk), &got, &type);
 			if (status != ERROR_SUCCESS) {
 				return false;
 			}
@@ -143,7 +119,16 @@ namespace
 	bool sendText(HINTERNET socket, const std::string& text)
 	{
 		return WinHttpWebSocketSend(socket, WINHTTP_WEB_SOCKET_UTF8_MESSAGE_BUFFER_TYPE,
-			const_cast<char*>(text.data()), static_cast<DWORD>(text.size())) == ERROR_SUCCESS;
+			const_cast<char*>(text.data()), static_cast<unsigned long>(text.size())) == ERROR_SUCCESS;
+	}
+
+	unsigned short parsePort(const std::string& port)
+	{
+		const int parsed = atoi(port.c_str());
+		if (parsed > 0 && parsed < 65536) {
+			return static_cast<unsigned short>(parsed);
+		}
+		return 4455;
 	}
 
 	bool sendRecordRequest(const Config& config, const char* requestType)
@@ -160,9 +145,12 @@ namespace
 		}
 		WinHttpSetTimeouts(session, 2000, 2000, 2000, 2000);
 
-		HINTERNET connect = WinHttpConnect(session, host.c_str(), config.port, 0);
-		HINTERNET request = connect ? WinHttpOpenRequest(connect, L"GET", L"/", nullptr,
-			WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES, 0) : nullptr;
+		HINTERNET connect = WinHttpConnect(session, host.c_str(), parsePort(config.port), 0);
+		HINTERNET request = nullptr;
+		if (connect) {
+			request = WinHttpOpenRequest(connect, L"GET", L"/", nullptr,
+				WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES, 0);
+		}
 		HINTERNET socket = nullptr;
 		bool ok = false;
 
@@ -173,7 +161,6 @@ namespace
 		}
 		if (request) {
 			WinHttpCloseHandle(request);
-			request = nullptr;
 		}
 
 		std::string hello;
@@ -188,16 +175,14 @@ namespace
 			}
 			identify += "}}";
 
-			std::string identified;
-			if (sendText(socket, identify) && receiveText(socket, &identified)) {
+			std::string reply;
+			if (sendText(socket, identify) && receiveText(socket, &reply)) {
 				static int requestId = 0;
-				++requestId;
 				const std::string body = std::string("{\"op\":6,\"d\":{\"requestType\":\"") + requestType
-					+ "\",\"requestId\":\"" + std::to_string(requestId) + "\"}}";
+					+ "\",\"requestId\":\"" + std::to_string(++requestId) + "\"}}";
 				ok = sendText(socket, body);
 				if (ok) {
-					std::string ignored;
-					receiveText(socket, &ignored);
+					receiveText(socket, &reply); // drain the RequestResponse
 				}
 			}
 		}
@@ -228,7 +213,11 @@ namespace
 			if (command == Command::Quit) {
 				break;
 			}
-			sendRecordRequest(config, command == Command::StartRecord ? "StartRecord" : "StopRecord");
+			const char* requestType = "StopRecord";
+			if (command == Command::StartRecord) {
+				requestType = "StartRecord";
+			}
+			sendRecordRequest(config, requestType);
 		}
 	}
 
@@ -249,36 +238,38 @@ namespace
 		}
 		gWake.notify_one();
 	}
-}
 
-void obsWebsocketConfigure(bool enabled, const char* host, const char* port, const char* password)
-{
-	std::lock_guard lock(gMutex);
-	gConfig.enabled = enabled;
-	gConfig.host = (host && host[0]) ? host : "127.0.0.1";
-	const int parsed = (port && port[0]) ? atoi(port) : 4455;
-	gConfig.port = static_cast<INTERNET_PORT>((parsed > 0 && parsed < 65536) ? parsed : 4455);
-	gConfig.password = password ? password : "";
-}
-
-void obsWebsocketStartRecord()
-{
-	enqueue(Command::StartRecord);
-}
-
-void obsWebsocketStopRecord()
-{
-	enqueue(Command::StopRecord);
-}
-
-void obsWebsocketShutdown()
-{
-	if (!gStarted.load()) {
-		return;
+	void configure(const Config& config)
+	{
+		std::lock_guard lock(gMutex);
+		gConfig = config;
+		if (gConfig.host.empty()) {
+			gConfig.host = "127.0.0.1";
+		}
+		if (gConfig.port.empty()) {
+			gConfig.port = "4455";
+		}
 	}
-	enqueue(Command::Quit);
-	if (gWorker.joinable()) {
-		gWorker.join();
+
+	void startRecord()
+	{
+		enqueue(Command::StartRecord);
 	}
-	gStarted.store(false);
+
+	void stopRecord()
+	{
+		enqueue(Command::StopRecord);
+	}
+
+	void shutdown()
+	{
+		if (!gStarted.load()) {
+			return;
+		}
+		enqueue(Command::Quit);
+		if (gWorker.joinable()) {
+			gWorker.join();
+		}
+		gStarted.store(false);
+	}
 }

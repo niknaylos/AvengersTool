@@ -15,12 +15,10 @@ public:
 	void createObjects(LPDIRECT3DDEVICE9 pDevice);
 	void initImgui(LPDIRECT3DDEVICE9 dev);
 	void addCallback(RenderCallback);
-	void setupImGuiStyle2();
 	int endsceneAddress = 0;
 
 private:
 	bool imguiInitialized = false;
-	bool firstRunStyle = true;
 	std::vector<RenderCallback> callbacksRender{};
 };
 

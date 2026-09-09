@@ -19,13 +19,6 @@ struct UiTheme
 	ImVec4 toggleOff     { 0.137f, 0.118f, 0.090f, 1.00f };
 };
 
-struct ThemePush
-{
-	int colors = 0;
-	int vars = 0;
-};
-
 const UiTheme& uiTheme();
 ImU32 uiCol32(const ImVec4& c);
-ThemePush uiThemeApply();
-void uiThemeRestore(const ThemePush& pushed);
+void uiThemeApply(ImGuiStyle& style);

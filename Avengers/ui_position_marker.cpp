@@ -1,6 +1,5 @@
 #include "pch.h"
 #include "ui_position_marker.h"
-#include "ui_widgets.h"
 
 ImU32 ui_position_marker::imVec4ToImCol32(const ImVec4& color)
 {
@@ -248,7 +247,7 @@ void ui_position_marker::menu()
     if (ImGui::Checkbox("Allow Binds", &avengers->instUiMenu->useMarkerBinds)) {
         avengers->saveConfiguration();
     }
-    uiw::checkboxTooltip("Numpad 1: Set a marker\nNumpad 2: Toggle the positioning helper\nNumpad 3: Toggle marker rendering");
+    ImGui::SetItemTooltip("Numpad 1: Set a marker\nNumpad 2: Toggle the positioning helper\nNumpad 3: Toggle marker rendering");
     ImGui::PushItemWidth(430.f);
     if (ImGui::SliderFloat("Marker Render Distance", &avengers->instUiMenu->markerRenderDistance, 0.f, 50000.f)) {
         avengers->saveConfiguration();
@@ -256,17 +255,17 @@ void ui_position_marker::menu()
     if (ImGui::Checkbox("Positioning Helper", &avengers->instUiMenu->positioningHelper)) {
         avengers->saveConfiguration();
     }
-    uiw::checkboxTooltip("Displays a positioning helper for nearby markers");
+    ImGui::SetItemTooltip("Displays a positioning helper for nearby markers");
     ImGui::SameLine();
     if (ImGui::Checkbox("Only on ground", &avengers->instUiMenu->positioningHelperOnlyonground)) {
         avengers->saveConfiguration();
     }
-    uiw::checkboxTooltip("Only displays the positioning helper while on the ground");
+    ImGui::SetItemTooltip("Only displays the positioning helper while on the ground");
     ImGui::SameLine();
     if (ImGui::Checkbox("Use legacy markers", &avengers->instUiMenu->useLegacyMarkers)) {
         avengers->saveConfiguration();
     }
-    uiw::checkboxTooltip("Renders a red circle instead of a vertical line");
+    ImGui::SetItemTooltip("Renders a red circle instead of a vertical line");
     if (ImGui::SliderFloat("Widget Render Distance", &avengers->instUiMenu->widgetRenderDistance, 0.f, 500.f)) {
         avengers->saveConfiguration();
     }

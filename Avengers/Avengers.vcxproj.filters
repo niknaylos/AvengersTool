@@ -70,6 +70,9 @@
     <ClCompile Include="ui_theme.cpp">
       <Filter>Source</Filter>
     </ClCompile>
+    <ClCompile Include="ui_widgets.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
     <ClCompile Include="ui_position.cpp">
       <Filter>Source</Filter>
     </ClCompile>

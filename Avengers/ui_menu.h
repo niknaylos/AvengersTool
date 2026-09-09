@@ -1,5 +1,6 @@
 #pragma once
 #include <array>
+#include <string>
 #include <unordered_map>
 #include "vectors.h"
 #include "config_manager.h"
@@ -87,8 +88,7 @@ public:
 	// Default the position to the center of the screen if there is no position in the config file
 	vec2<float> veloPos = vec2<float>(GetSystemMetrics(SM_CXSCREEN) / 2, GetSystemMetrics(SM_CYSCREEN) / 2);
 
-	char* demoName = nullptr;
-	std::array<char, 128> demoBindName {};
+	std::string demoBindName;
 	vec3<float> copiedPositionView;
 	vec3<float> copiedPositionOrigin;
 	
@@ -109,8 +109,9 @@ public:
 	bool shouldFocusNextFrame = false;
 	std::string currentAhStyle = "Style 1";
 	std::string selectedSpeedometerFont = "Bahnschrift";
+	std::string selectedMenuFont = "Trebuchet";
+	float menuFontSize = 16.f;
 	std::unordered_map<std::string, ImFont*> loadedFonts;
-	ImFont* menuFont = nullptr;
 	ImFont* getMenuFont() const;
 	ImFont* getSpeedometerFont() const;
 	void registerConfigs(Avengers* hud);
@@ -118,5 +119,29 @@ public:
 	void copyPosition(Avengers* hud);
 	void bindDemoLoadKey(Avengers* hud);
 
+private:
+	static constexpr float kSidebarW = 196.f;
+
+	struct MenuTabInfo
+	{
+		std::string title;
+		std::string subtitle;
+		void (ui_menu::*draw)(Avengers* hud);
+	};
+
+	// Indexed by MenuTab.
+	static const std::array<MenuTabInfo, 9> kMenuTabs;
+
+	ImFont* lookupFont(const std::string& name) const;
+	bool fontCombo(const std::string& label, const std::string& desc, std::string* selected, const std::string& fallback);
+	void drawGeneral(Avengers* hud);
+	void drawVelocity(Avengers* hud);
+	void drawJumpTarget(Avengers* hud);
+	void drawAngleHelper(Avengers* hud);
+	void drawFpsWheel(Avengers* hud);
+	void drawMisc(Avengers* hud);
+	void drawCollisionPage(Avengers* hud);
+	void drawMarkers(Avengers* hud);
+	void drawDemoPlayer(Avengers* hud);
 };
 
