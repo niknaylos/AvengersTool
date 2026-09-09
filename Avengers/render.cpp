@@ -94,17 +94,10 @@ void render::initImgui(LPDIRECT3DDEVICE9 dev)
 			hud->instUiMenu->loadedFonts.emplace("Awesome Font 1", awesomeFont);
 		}
 
-		char windowsDirectory[MAX_PATH] {};
-		const UINT windowsDirectoryLength = GetWindowsDirectoryA(windowsDirectory, MAX_PATH);
-		if (windowsDirectoryLength > 0 && windowsDirectoryLength < MAX_PATH) {
-			const std::filesystem::path trebuchetPath =
-				std::filesystem::path(windowsDirectory) / "Fonts" / "trebuc.ttf";
-			if (std::filesystem::is_regular_file(trebuchetPath)) {
-				ImFont* trebuchetFont = io.Fonts->AddFontFromFileTTF(trebuchetPath.string().c_str(), 16.f);
-				if (trebuchetFont) {
-					hud->instUiMenu->loadedFonts.emplace("Trebuchet", trebuchetFont);
-				}
-			}
+		ImFont* trebuchetFont = io.Fonts->AddFontFromMemoryTTF(
+			(void*)(_actrebuchet), sizeof(_actrebuchet) - 1, 16.f, &fontConfig);
+		if (trebuchetFont) {
+			hud->instUiMenu->loadedFonts.emplace("Trebuchet", trebuchetFont);
 		}
 
 		const std::filesystem::path fontDirectory = "AvengersFonts";

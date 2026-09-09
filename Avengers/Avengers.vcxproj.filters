@@ -10,6 +10,9 @@
     <ClCompile Include="bahnschrift.c">
       <Filter>Data</Filter>
     </ClCompile>
+    <ClCompile Include="trebuchet.c">
+      <Filter>Data</Filter>
+    </ClCompile>
     <ClCompile Include="dllmain.cpp">
       <Filter>Source</Filter>
     </ClCompile>
